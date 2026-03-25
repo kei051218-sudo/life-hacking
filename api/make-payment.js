@@ -34,20 +34,17 @@ export default async function handler(req) {
   }
 
   try {
-    const { userKey } = await req.json();
+    const { payToken, orderNo, userKey } = await req.json();
 
-    if (!userKey) {
+    if (!payToken || !orderNo || !userKey) {
       return new Response(
-        JSON.stringify({ error: 'userKey가 필요합니다' }),
+        JSON.stringify({ error: 'payToken, orderNo, userKey가 모두 필요합니다' }),
         { status: 400, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
       );
     }
 
-    // 유니크 주문번호 생성
-    const orderNo = `umh-${Date.now()}-${Math.floor(Math.random() * 9000) + 1000}`;
-
-    const payRes = await mtlsFetch(
-      `${TOSS_PAY_BASE}/api-partner/v1/apps-in-toss/pay/make-payment`,
+    const execRes = await mtlsFetch(
+      `${TOSS_PAY_BASE}/api-partner/v1/apps-in-toss/pay/execute-payment`,
       {
         method: 'POST',
         headers: {
@@ -55,31 +52,29 @@ export default async function handler(req) {
           'x-toss-user-key': String(userKey),
         },
         body: JSON.stringify({
+          payToken,
           orderNo,
-          productDesc: '운명해킹 9파트 심층 분석',
-          amount: 2900,
-          amountTaxFree: 0,
           isTestPayment: false,
         }),
       }
     );
-    const payData = await payRes.json();
+    const execData = await execRes.json();
 
-    if (payData.resultType !== 'SUCCESS') {
+    if (execData.resultType !== 'SUCCESS') {
       return new Response(
-        JSON.stringify({ error: '결제 생성 실패', detail: payData }),
+        JSON.stringify({ error: '결제 승인 실패', detail: execData }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
       );
     }
 
     return new Response(
-      JSON.stringify({ payToken: payData.success.payToken, orderNo }),
+      JSON.stringify({ success: true, data: execData.success }),
       { status: 200, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
     );
 
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: 'make-payment 오류', detail: error.message }),
+      JSON.stringify({ error: 'execute-payment 오류', detail: error.message }),
       { status: 500, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
     );
   }
