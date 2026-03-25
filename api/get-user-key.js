@@ -1,5 +1,10 @@
 import https from 'https';
 
+export const config = {
+  runtime: 'nodejs',
+  maxDuration: 30,
+};
+
 const TOSS_LOGIN_BASE = 'https://apps-in-toss-api.toss.im';
 
 const CORS_HEADERS = {
