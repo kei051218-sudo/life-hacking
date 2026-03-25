@@ -1,12 +1,12 @@
+import fetch from 'node-fetch';
 import https from 'https';
 
 const TOSS_PAY_BASE = 'https://pay-apps-in-toss-api.toss.im';
 
-function mtlsFetch(url, options = {}) {
+function getMtlsAgent() {
   const cert = process.env.TOSS_CERT?.replace(/\\n/g, '\n');
   const key = process.env.TOSS_KEY?.replace(/\\n/g, '\n');
-  const agent = new https.Agent({ cert, key, rejectUnauthorized: true });
-  return fetch(url, { ...options, agent });
+  return new https.Agent({ cert, key, rejectUnauthorized: true });
 }
 
 export default async function handler(req, res) {
@@ -28,9 +28,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'userKey가 필요합니다' });
     }
 
+    const agent = getMtlsAgent();
     const orderNo = `umh-${Date.now()}-${Math.floor(Math.random() * 9000) + 1000}`;
 
-    const payRes = await mtlsFetch(
+    const payRes = await fetch(
       `${TOSS_PAY_BASE}/api-partner/v1/apps-in-toss/pay/make-payment`,
       {
         method: 'POST',
@@ -45,9 +46,11 @@ export default async function handler(req, res) {
           amountTaxFree: 0,
           isTestPayment: false,
         }),
+        agent,
       }
     );
     const payData = await payRes.json();
+    console.log('[make-payment] resultType:', payData.resultType, JSON.stringify(payData).slice(0, 300));
 
     if (payData.resultType !== 'SUCCESS') {
       return res.status(500).json({ error: '결제 생성 실패', detail: payData });
@@ -56,6 +59,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ payToken: payData.success.payToken, orderNo });
 
   } catch (error) {
+    console.error('[make-payment] 오류:', error.message);
     return res.status(500).json({ error: 'make-payment 오류', detail: error.message });
   }
 }
